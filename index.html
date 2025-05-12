@@ -6,7 +6,8 @@
   <title>FXパターン通知アプリ</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body><button onclick="requestNotificationPermission()">通知を許可する</button>
+<body>
+  <button onclick="requestNotificationPermission()">通知を許可する</button>
 <script>
 function requestNotificationPermission() {
   Notification.requestPermission().then(function (permission) {
