@@ -6,7 +6,18 @@
   <title>FXパターン通知アプリ</title>
   <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body><button onclick="requestNotificationPermission()">通知を許可する</button>
+<script>
+function requestNotificationPermission() {
+  Notification.requestPermission().then(function (permission) {
+    if (permission === 'granted') {
+      alert('通知が許可されました');
+    } else {
+      alert('通知が拒否されました');
+    }
+  });
+}
+</script>
   <h1>FXパターン通知アプリが起動しました</h1>
   <p>自動チャート監視中…</p>
 
