@@ -10,4 +10,23 @@
   <iframe id="chartFrame" src="https://example.com" width="100%" height="300"></iframe>
   <canvas id="chartCanvas" style="border:1px solid #ccc; margin-top:10px;"></canvas>
 </body>
-</html>
+<script>
+  const iframe = document.getElementById('chartFrame');
+  const canvas = document.getElementById('chartCanvas');
+  const ctx = canvas.getContext('2d');
+
+  iframe.onload = () => {
+    try {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      const iframeBody = iframeDoc.body;
+
+      html2canvas(iframeBody).then(capturedCanvas => {
+        canvas.width = capturedCanvas.width;
+        canvas.height = capturedCanvas.height;
+        ctx.drawImage(capturedCanvas, 0, 0);
+      });
+    } catch (e) {
+      console.error('iframeの内容を取得できませんでした。', e);
+    }
+  };
+</script></html>
