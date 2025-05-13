@@ -4,30 +4,63 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>自動チャート検出テスト</title>
-<script src="https://docs.opencv.org/4.x/opencv.js"></script>
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script></head>
+  <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
 <body>
   <h2>自動チャート検出テスト</h2>
-  <iframe id="chartFrame" src="https://example.com" width="100%" height="300"></iframe>
-  <canvas id="chartCanvas" style="border:1px solid #ccc; margin-top:10px;"></canvas>
-</body>
-<script>
-  const iframe = document.getElementById('chartFrame');
-  const canvas = document.getElementById('chartCanvas');
-  const ctx = canvas.getContext('2d');
+  <iframe id="chartFrame" src="https://example.com" width="360" height="300"></iframe>
+  <canvas id="chartCanvas" style="display:none;"></canvas>
 
-  iframe.onload = () => {
-    try {
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-      const iframeBody = iframeDoc.body;
+  <script>
+    function compareImages(mat1, mat2) {
+      const result = new cv.Mat();
+      cv.absdiff(mat1, mat2, result);
+      const gray = new cv.Mat();
+      cv.cvtColor(result, gray, cv.COLOR_RGBA2GRAY);
+      const nonZero = cv.countNonZero(gray);
+      const totalPixels = gray.rows * gray.cols;
+      const similarity = ((totalPixels - nonZero) / totalPixels) * 100;
+      result.delete();
+      gray.delete();
+      return similarity;
+    }
 
-      html2canvas(iframeBody).then(capturedCanvas => {
+    async function captureAndCompare() {
+      const iframe = document.getElementById('chartFrame');
+      const canvas = document.getElementById('chartCanvas');
+      const context = canvas.getContext('2d');
+
+      try {
+        const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+        const iframeBody = iframeDocument.body;
+
+        const capturedCanvas = await html2canvas(iframeBody);
         canvas.width = capturedCanvas.width;
         canvas.height = capturedCanvas.height;
-        ctx.drawImage(capturedCanvas, 0, 0);
-      });
-    } catch (e) {
-      console.error('iframeの内容を取得できませんでした。', e);
+        context.drawImage(capturedCanvas, 0, 0);
+
+        const capturedImage = cv.imread(canvas);
+        const dummyPattern = cv.imread(canvas); // 本来は別画像にすべき
+
+        const similarity = compareImages(capturedImage, dummyPattern);
+        console.log(`類似度: ${similarity.toFixed(2)}%`);
+
+        capturedImage.delete();
+        dummyPattern.delete();
+      } catch (error) {
+        console.error("キャプチャ処理エラー:", error);
+      }
     }
-  };
-</script></html>
+
+    window.addEventListener('load', () => {
+      const checkReady = setInterval(() => {
+        if (cv && cv.imread) {
+          clearInterval(checkReady);
+          setInterval(captureAndCompare, 5000);
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>
