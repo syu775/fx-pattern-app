@@ -76,7 +76,9 @@ function checkPatterns(chartMat, currencyPair) {
     if (!patternMat) continue;
     const similarity = compareImages(chartMat, patternMat);
     if (similarity >= threshold) {
-      console.log(`[検出] ${currencyPair} - ${key} 類似度: ${similarity.toFixed(2)}%`);
+      console.log(`[検出] ${currencyPair} - ${key} 類似度: ${similarity.toFixed(2)}%`);console.log(msg);
+  sendSlackNotification(msg);
+}
     }
   }
 }function startMonitoring() {
@@ -96,3 +98,20 @@ function checkPatterns(chartMat, currencyPair) {
 window.addEventListener('load', () => {
   startMonitoring();
 });
+function sendSlackNotification(message) {
+  const webhookUrl = "https://hooks.slack.com/services/XXXXXXXX/XXXXXXXX/XXXXXXXXXXXXXXXX"; // 提督のSlack URLに差し替え
+
+  fetch(webhookUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ text: message })
+  }).then(res => {
+    if (!res.ok) {
+      console.error("Slack通知に失敗しました");
+    }
+  }).catch(err => {
+    console.error("Slack通知エラー:", err);
+  });
+}
