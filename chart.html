@@ -3,16 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>自動チャート検出テスト</title>
+  <title>自動チャート監視システム</title>
   <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </head>
 <body>
-  <h2>自動チャート検出テスト</h2>
-  <iframe id="chartFrame" src="https://example.com" width="360" height="300"></iframe>
+  <h2>チャート監視中</h2>
+  <iframe id="chartFrame" src="https://fx.minkabu.jp/pair/USDJPY/chart" width="360" height="300"></iframe>
   <canvas id="chartCanvas" style="display:none;"></canvas>
 
   <script>
+    const WEBHOOK_URL = "https://hooks.slack.com/services/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";
+
     function compareImages(mat1, mat2) {
       const result = new cv.Mat();
       cv.absdiff(mat1, mat2, result);
@@ -32,25 +34,41 @@
       const context = canvas.getContext('2d');
 
       try {
-        const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
-        const iframeBody = iframeDocument.body;
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const iframeBody = iframeDoc.body;
 
         const capturedCanvas = await html2canvas(iframeBody);
         canvas.width = capturedCanvas.width;
         canvas.height = capturedCanvas.height;
         context.drawImage(capturedCanvas, 0, 0);
 
-        const capturedImage = cv.imread(canvas);
-        const dummyPattern = cv.imread(canvas); // 本来は別画像にすべき
+        const capturedMat = cv.imread(canvas);
+        const dummyPattern = cv.imread(canvas); // デモ用（本番では pattern画像に差し替え）
 
-        const similarity = compareImages(capturedImage, dummyPattern);
+        const similarity = compareImages(capturedMat, dummyPattern);
         console.log(`類似度: ${similarity.toFixed(2)}%`);
 
-        capturedImage.delete();
+        if (similarity > 90) {
+          sendSlack(`検出通知: 類似度 ${similarity.toFixed(2)}%`);
+        }
+
+        capturedMat.delete();
         dummyPattern.delete();
       } catch (error) {
         console.error("キャプチャ処理エラー:", error);
       }
+    }
+
+    function sendSlack(message) {
+      fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message })
+      }).then(res => {
+        if (!res.ok) console.error("Slack送信失敗");
+      }).catch(err => {
+        console.error("Slackエラー:", err);
+      });
     }
 
     window.addEventListener('load', () => {
