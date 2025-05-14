@@ -30,3 +30,4 @@ function sendSlackNotification(message) {
     .then(response => console.log("Slack通知送信:", response.status))
     .catch(error => console.error("Slack通知エラー:", error));
 }
+sendSlackNotification("通知テスト送信（Cloudflare Workersから）");
