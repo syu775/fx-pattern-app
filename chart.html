@@ -3,82 +3,132 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>自動チャート監視システム</title>
+  <title>FXチャート監視システム</title>
   <script src="https://docs.opencv.org/4.x/opencv.js" async></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+    iframe {
+      width: 360px;
+      height: 300px;
+      border: 1px solid #ccc;
+      margin: 10px;
+    }
+  </style>
 </head>
 <body>
-  <h2>チャート監視中</h2>
-  <iframe id="chartFrame" src="https://fx.minkabu.jp/pair/USDJPY/chart" width="360" height="300"></iframe>
-  <canvas id="chartCanvas" style="display:none;"></canvas>
+  <h2>チャート監視中（5分ごと自動判定）</h2>
+
+  <iframe src="https://fx.minkabu.jp/pair/USDJPY/chart" data-symbol="USD/JPY"></iframe>
+  <iframe src="https://fx.minkabu.jp/pair/EURJPY/chart" data-symbol="EUR/JPY"></iframe>
+  <iframe src="https://fx.minkabu.jp/pair/GBPJPY/chart" data-symbol="GBP/JPY"></iframe>
+
+  <canvas id="hiddenCanvas" style="display:none;"></canvas>
 
   <script>
     const WEBHOOK_URL = "https://hooks.slack.com/services/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";
 
-    function compareImages(mat1, mat2) {
-      const result = new cv.Mat();
-      cv.absdiff(mat1, mat2, result);
-      const gray = new cv.Mat();
-      cv.cvtColor(result, gray, cv.COLOR_RGBA2GRAY);
-      const nonZero = cv.countNonZero(gray);
-      const totalPixels = gray.rows * gray.cols;
-      const similarity = ((totalPixels - nonZero) / totalPixels) * 100;
-      result.delete();
-      gray.delete();
-      return similarity;
+    const patternPaths = {
+      "High1": "pattern_up_pog2.png",
+      "High2": "pattern_extra1.png",
+      "High3": "pattern_extra2.png",
+      "Low1": "pattern_up_pog1.png",
+      "Low2": "pattern_down_pog1.png",
+      "Low3": "pattern_down_pog2.png"
+    };
+
+    const patternLabels = {
+      "High1": "上昇POG②（抜け）",
+      "High2": "赤縦足1",
+      "High3": "赤縦足2",
+      "Low1": "上昇POG①（寄せ）",
+      "Low2": "下降POG①（寄せ）",
+      "Low3": "下降POG②（抜け）"
+    };
+
+    const loadedPatterns = {};
+
+    function loadPatterns(callback) {
+      let count = 0;
+      const total = Object.keys(patternPaths).length;
+
+      for (const key in patternPaths) {
+        const img = new Image();
+        img.src = patternPaths[key];
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          canvas.getContext("2d").drawImage(img, 0, 0);
+          loadedPatterns[key] = cv.imread(canvas);
+          count++;
+          if (count === total) callback();
+        };
+      }
     }
 
-    async function captureAndCompare() {
-      const iframe = document.getElementById('chartFrame');
-      const canvas = document.getElementById('chartCanvas');
-      const context = canvas.getContext('2d');
+    function compareImages(mat1, mat2) {
+      const result = new cv.Mat();
+      cv.matchTemplate(mat1, mat2, result, cv.TM_CCOEFF_NORMED);
+      const minMax = cv.minMaxLoc(result);
+      result.delete();
+      return minMax.maxVal * 100;
+    }
 
+    function sendSlack(pair, signal, similarity) {
+      const text = `【${pair}】${signal} 判定\n類似度: ${similarity.toFixed(2)}%`;
+      fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+    }
+
+    async function processIframe(iframe) {
       try {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-        const iframeBody = iframeDoc.body;
+        const pair = iframe.dataset.symbol;
+        const canvas = document.getElementById("hiddenCanvas");
+        const context = canvas.getContext("2d");
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        const body = doc.body;
 
-        const capturedCanvas = await html2canvas(iframeBody);
+        const capturedCanvas = await html2canvas(body);
         canvas.width = capturedCanvas.width;
         canvas.height = capturedCanvas.height;
         context.drawImage(capturedCanvas, 0, 0);
 
         const capturedMat = cv.imread(canvas);
-        const dummyPattern = cv.imread(canvas); // デモ用（本番では pattern画像に差し替え）
 
-        const similarity = compareImages(capturedMat, dummyPattern);
-        console.log(`類似度: ${similarity.toFixed(2)}%`);
-
-        if (similarity > 90) {
-          sendSlack(`検出通知: 類似度 ${similarity.toFixed(2)}%`);
+        for (const key in loadedPatterns) {
+          const similarity = compareImages(capturedMat, loadedPatterns[key]);
+          if (similarity > 90) {
+            const type = key.startsWith("High") ? "High" : "Low";
+            sendSlack(pair, `${type}（${patternLabels[key]}）`, similarity);
+            break;
+          }
         }
 
         capturedMat.delete();
-        dummyPattern.delete();
-      } catch (error) {
-        console.error("キャプチャ処理エラー:", error);
+      } catch (e) {
+        console.error("比較失敗:", e);
       }
     }
 
-    function sendSlack(message) {
-      fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message })
-      }).then(res => {
-        if (!res.ok) console.error("Slack送信失敗");
-      }).catch(err => {
-        console.error("Slackエラー:", err);
-      });
+    function monitor() {
+      const now = new Date();
+      const minutes = now.getMinutes();
+      const seconds = now.getSeconds();
+
+      if (minutes % 5 === 0 && seconds <= 3) {
+        const iframes = document.querySelectorAll("iframe[data-symbol]");
+        iframes.forEach(iframe => processIframe(iframe));
+      }
     }
 
-    window.addEventListener('load', () => {
-      const checkReady = setInterval(() => {
-        if (cv && cv.imread) {
-          clearInterval(checkReady);
-          setInterval(captureAndCompare, 5000);
-        }
-      }, 500);
-    });
+    function onOpenCvReady() {
+      loadPatterns(() => {
+        setInterval(monitor, 1000);
+      });
+    }
   </script>
 </body>
 </html>
