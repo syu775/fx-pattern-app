@@ -20,5 +20,122 @@
     <iframe src="https://fx.minkabu.jp/pair/AUDUSD" data-symbol="AUDUSD"></iframe>
     <iframe src="https://fx.minkabu.jp/pair/USDJPY" data-symbol="USDJPY"></iframe>
   </div>
-</body>
+<script src="https://docs.opencv.org/4.x/opencv.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script>
+  const WEBHOOK_URL = "https://hooks.slack.com/services/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";
+
+  const patternPaths = {
+    "Low1": "pattern1.jpeg",   // 下降のPOG②（抜け）
+    "High1": "pattern2.jpeg",  // 上昇のPOG①（寄せ）
+    "High2": "pattern3.jpeg",  // 下降のPOG①（寄せ）
+    "High3": "pattern4.jpeg",  // 上昇のPOG②（抜け）
+    "Low2": "pattern5.jpeg",   // 下降のPOG①（別角度）
+    "Low3": "pattern6.jpeg"    // 上昇のPOG①（別角度）
+  };
+
+  const patternLabels = {
+    "Low1": "下降のPOG②（抜け）",
+    "High1": "上昇のPOG①（寄せ）",
+    "High2": "下降のPOG①（寄せ）",
+    "High3": "上昇のPOG②（抜け）",
+    "Low2": "下降のPOG①（別角度）",
+    "Low3": "上昇のPOG①（別角度）"
+  };
+
+  const loadedPatterns = {};
+
+  function loadPatterns(callback) {
+    let count = 0;
+    const total = Object.keys(patternPaths).length;
+
+    for (const key in patternPaths) {
+      const img = new Image();
+      img.src = patternPaths[key];
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        loadedPatterns[key] = cv.imread(canvas);
+        count++;
+        if (count === total) callback();
+      };
+    }
+  }
+
+  function compareImages(mat1, mat2) {
+    const result = new cv.Mat();
+    cv.matchTemplate(mat1, mat2, result, cv.TM_CCOEFF_NORMED);
+    const minMax = cv.minMaxLoc(result);
+    result.delete();
+    return minMax.maxVal * 100;
+  }
+
+  function sendSlack(pair, signal, similarity) {
+    const text = `【${pair}】${signal} 判定\n類似度: ${similarity.toFixed(2)}%`;
+    fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
+    });
+  }
+
+  async function processIframe(iframe) {
+    try {
+      const pair = iframe.dataset.symbol;
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      const body = doc.body;
+
+      const capturedCanvas = await html2canvas(body);
+      canvas.width = capturedCanvas.width;
+      canvas.height = capturedCanvas.height;
+      context.drawImage(capturedCanvas, 0, 0);
+
+      const capturedMat = cv.imread(canvas);
+
+      for (const key in loadedPatterns) {
+        const similarity = compareImages(capturedMat, loadedPatterns[key]);
+        if (similarity > 90) {
+          const label = patternLabels[key];
+          const type = key.startsWith("High") ? "High" : "Low";
+          sendSlack(pair, `${type}（${label}）`, similarity);
+          break;
+        }
+      }
+
+      capturedMat.delete();
+    } catch (e) {
+      console.error("比較失敗:", e);
+    }
+  }
+
+  function monitor() {
+    const now = new Date();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+
+    if (minutes % 5 === 0 && seconds <= 3) {
+      const iframes = document.querySelectorAll("iframe[data-symbol]");
+      iframes.forEach(iframe => processIframe(iframe));
+    }
+  }
+
+  function onOpenCvReady() {
+    loadPatterns(() => {
+      setInterval(monitor, 1000);
+    });
+  }
+
+  window.onload = () => {
+    if (typeof cv === 'undefined') {
+      console.log("OpenCV未ロード");
+    } else {
+      onOpenCvReady();
+    }
+  };
+</script></body>
 </html>
