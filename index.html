@@ -1,33 +1,72 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>Slack通知設定</title>
+  <meta charset="UTF-8" />
+  <title>システム設定</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    input, label { display: block; margin: 10px 0; }
-    input[type="text"] { width: 100%; max-width: 500px; padding: 8px; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    label {
+      display: block;
+      margin: 4px 0;
+    }
+    textarea {
+      width: 100%;
+    }
   </style>
 </head>
 <body>
-  <h1>Slack通知設定</h1>
+  <h1>システム</h1>
 
-  <label for="webhook">Slack Webhook URL</label>
-  <input type="text" id="webhook" placeholder="https://hooks.slack.com/services/...">
+  <h2>通貨ペア選択</h2>
+  <div id="pairList"></div>
+
+  <h2>通知設定</h2>
+  <label>
+    Slack Webhook URL:
+    <input type="text" id="webhookUrl" placeholder="https://hooks.slack.com/services/..." style="width: 100%" />
+  </label>
+
+  <p><strong>ステータス</strong></p>
+  <p>通知処理は <code>chart.html</code> にて自動実行されます。</p>
 
   <script>
-    // ページ読み込み時に保存済みURLを反映
-    window.addEventListener('DOMContentLoaded', () => {
-      const input = document.querySelector('#webhook');
-      const savedUrl = localStorage.getItem('webhookUrl');
-      if (savedUrl) {
-        input.value = savedUrl;
-      }
+    const pairs = [
+      "USD/JPY", "EUR/JPY", "GBP/JPY", "AUD/JPY", "NZD/JPY",
+      "EUR/USD", "GBP/USD", "AUD/USD", "BTC/JPY", "ETH/JPY",
+      "XRP/JPY", "SOL/JPY"
+    ];
 
-      // 入力変更時に保存
-      input.addEventListener('input', () => {
-        localStorage.setItem('webhookUrl', input.value);
-      });
+    const storedWebhook = localStorage.getItem("slackWebhook");
+    const storedPairs = JSON.parse(localStorage.getItem("selectedPairs") || "[]");
+
+    const pairListDiv = document.getElementById("pairList");
+    pairs.forEach(pair => {
+      const id = `pair-${pair.replace("/", "")}`;
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.id = id;
+      checkbox.value = pair;
+      checkbox.checked = storedPairs.includes(pair);
+      checkbox.onchange = () => {
+        const selected = Array.from(document.querySelectorAll("#pairList input:checked")).map(cb => cb.value);
+        localStorage.setItem("selectedPairs", JSON.stringify(selected));
+      };
+
+      const label = document.createElement("label");
+      label.htmlFor = id;
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(" " + pair));
+
+      pairListDiv.appendChild(label);
+    });
+
+    const webhookInput = document.getElementById("webhookUrl");
+    webhookInput.value = storedWebhook || "";
+    webhookInput.addEventListener("change", () => {
+      localStorage.setItem("slackWebhook", webhookInput.value.trim());
     });
   </script>
 </body>
