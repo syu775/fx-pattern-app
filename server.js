@@ -1,27 +1,33 @@
-// FX Slack通知サーバー（2025-05-15 再デプロイ用更新）
-
 const express = require('express');
 const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Slack Webhook URL
-const SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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";
+// Slack Webhook URL（環境変数から取得）
+const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
-// テスト通知エンドポイント
+// ルート確認用
+app.get('/', (req, res) => {
+  res.send('FX Notify Server is running');
+});
+
+// Slack通知テスト用のエンドポイント
 app.get('/notify', async (req, res) => {
+  if (!webhookUrl) {
+    return res.status(500).send('Slack Webhook URLが設定されていません');
+  }
+
   try {
-    await axios.post(SLACK_WEBHOOK_URL, {
-      text: '【通知テスト】Slack通知サーバーが正常に動作しています（再デプロイ確認済）'
+    await axios.post(webhookUrl, {
+      text: '通知テスト：FXパターン検出BotからのSlack通知成功'
     });
-    res.send('通知送信成功！');
+    res.send('Slack通知に成功しました');
   } catch (error) {
-    console.error('通知失敗:', error);
-    res.status(500).send('通知送信に失敗しました');
+    console.error('通知エラー:', error.message);
+    res.status(500).send('Slack通知に失敗しました');
   }
 });
 
-// サーバー起動
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
