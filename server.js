@@ -1,31 +1,27 @@
+// server.js
 const express = require('express');
 const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Slack Webhook URL（環境変数から取得）
-const webhookUrl = process.env.SLACK_WEBHOOK_URL;
-
-// ルート確認用
-app.get('/', (req, res) => {
-  res.send('FX Notify Server is running');
-});
-
-// Slack通知テスト用のエンドポイント
 app.get('/notify', async (req, res) => {
-  if (!webhookUrl) {
-    return res.status(500).send('Slack Webhook URLが設定されていません');
-  }
+  const webhookUrl = 'https://hooks.slack.com/services/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';
+  const message = {
+    text: '【通知テスト】Slack Bot からの送信に成功しました。',
+  };
 
   try {
-    await axios.post(webhookUrl, {
-      text: '通知テスト：FXパターン検出BotからのSlack通知成功'
-    });
-    res.send('Slack通知に成功しました');
+    await axios.post(webhookUrl, message);
+    console.log('通知送信に成功しました。');
+    res.status(200).send('Slack通知を送信しました。');
   } catch (error) {
-    console.error('通知エラー:', error.message);
-    res.status(500).send('Slack通知に失敗しました');
+    console.error('Slack通知エラー:', error.message);
+    res.status(500).send('通知に失敗しました。');
   }
+});
+
+app.get('/', (req, res) => {
+  res.send('FX Notify Server is running');
 });
 
 app.listen(PORT, () => {
