@@ -1,25 +1,19 @@
-// server.js
 const express = require('express');
-const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// SlackのWebhook URL（提督のURLに置き換える）
-const SLACK_WEBHOOK_URL = 'https://hooks.slack.com/services/〇〇〇/〇〇〇/〇〇〇'; // 実際のURLに変更！
-
+// 通知テスト用ルート
 app.get('/', (req, res) => {
   res.send('FX Notify Server is running!');
 });
 
-// 通知送信エンドポイント
-app.get('/notify', async (req, res) => {
-  const text = req.query.text || 'テスト通知';
-  try {
-    await axios.post(SLACK_WEBHOOK_URL, { text });
-    res.send('通知を送信しました');
-  } catch (error) {
-    res.status(500).send('通知送信に失敗しました');
-  }
+// 通知送信用ルート
+app.get('/notify', (req, res) => {
+  const text = req.query.text || 'Default Message';
+
+  // ここでSlack WebhookやLINE Notifyなどに送信する処理を書く
+  console.log(`通知テスト: ${text}`);
+  res.send(`通知内容: ${text}`);
 });
 
 app.listen(PORT, () => {
