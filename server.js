@@ -3,6 +3,7 @@ const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Renderの環境変数からWebhook URLを取得
 const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 
 app.get('/', (req, res) => {
@@ -12,12 +13,12 @@ app.get('/', (req, res) => {
 app.get('/notify', async (req, res) => {
   try {
     await axios.post(webhookUrl, {
-      text: '通知テスト：FXパターンを検出しました'
+      text: '【通知テスト】FXパターン検出しました！'
     });
-    res.send('通知を送信しました');
-  } catch (error) {
-    console.error('通知送信エラー:', error.message);
-    res.status(500).send('通知送信に失敗しました');
+    res.send('通知送信成功');
+  } catch (err) {
+    console.error('通知失敗:', err.message);
+    res.status(500).send('通知失敗');
   }
 });
 
